@@ -4,6 +4,26 @@ local curl = require("plenary.curl")
 
 local config = {}
 
+local function extract_completion_code(response)
+  -- Extract the content between <COMPLETION> tags
+  local code = response:match("<COMPLETION>(.-)</COMPLETION>")
+  
+  if code then
+    -- Trim leading and trailing whitespace
+    code = code:match("^%s*(.-)%s*$")
+    
+    -- Remove any common indentation
+    local indent = code:match("^%s+")
+    if indent then
+      local pattern = "^" .. indent
+      code = code:gsub(pattern, "", 1)  -- Remove from first line
+      code = code:gsub("\n" .. pattern, "\n")  -- Remove from other lines
+    end
+  end
+  
+  return code
+end
+
 function M.set_config(new_config)
     config = new_config
 end
@@ -62,9 +82,12 @@ end
 
 -- Function to send request to Ollama API with FIM format
 function M.send_to_ollama(prefix, suffix)
-    local prompt = string.format(config.template, prefix, suffix)
 
-    print(prompt)
+    local template = require('fim.templates')
+    local general_template = template.getTemplate("general")
+    local prompt = string.format(general_template, prefix, suffix)
+
+    -- print(prompt)
     
     local response = curl.post(config.api_url, {
         body = vim.fn.json_encode({
@@ -73,7 +96,7 @@ function M.send_to_ollama(prefix, suffix)
             stream = false,
             options = {
                 temperature = config.temperature,
-                num_predict = config.num_predict 
+                num_predict = config.num_predict,
             }
         }),
         headers = {
@@ -100,11 +123,34 @@ function M.fill_in_middle()
     local prefix, suffix = M.extract_function_parts()
     if prefix and suffix then
         local completed_code = M.send_to_ollama(prefix, suffix)
-        if completed_code then
-            -- Insert the completed code
-            local bufnr = vim.api.nvim_get_current_buf()
-            local cursor = vim.api.nvim_win_get_cursor(0)
-            vim.api.nvim_buf_set_lines(bufnr, cursor[1], cursor[1], false, vim.split(completed_code, "\n"))
+        local extracted_code = extract_completion_code(completed_code)
+        if extracted_code then
+          print(extracted_code)
+        else
+          print("No completion found in the response")
+        end
+        if extracted_code then
+            -- 
+            local buf = vim.api.nvim_get_current_buf()
+            -- Get the cursor position
+            local row, col = unpack(vim.api.nvim_win_get_cursor(0))
+            
+            local indent = vim.fn.indent(vim.fn.line('.'))
+            -- Split the completion code into lines
+            local lines = vim.split(extracted_code, "\n")
+            -- add indent for each line
+            local indented_lines = {}
+            for _, line in ipairs(lines) do
+              table.insert(indented_lines, string.rep(' ', indent) .. line)
+            end
+            
+            -- Insert the completion code
+            vim.api.nvim_buf_set_lines(buf, row - 1, row - 1, false, indented_lines)
+            
+            -- Move the cursor to the end of the inserted text
+            local new_row = row + #indented_lines - 1
+            local new_col = #indented_lines[#indented_lines]
+            vim.api.nvim_win_set_cursor(0, {new_row, new_col})
         end
     else
         print("Unable to extract function parts")

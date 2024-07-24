@@ -6,7 +6,7 @@ local default_config = {
     api_url = "http://localhost:11434/api/generate",
     temperature = 0.2,
     template = "<fim_prefix>%s<fim_suffix>%s<fim_middle>",
-    num_predict = 48,
+    num_predict = 1024,
     context_lines = 5,  -- Number of lines to extract above/below cursor when not in a function
 }
 
@@ -33,7 +33,7 @@ function M.setup(opts)
     -- Merge user options with defaults
     M.config = vim.tbl_deep_extend("force", default_config, opts)
     -- Load the ollama module
-    local fim= require("fim.fim")
+    local fim = require("fim.fim")
     fim.set_config(M.config)  -- Pass the config to ollama module
     -- Create user command
     vim.api.nvim_create_user_command("FIM", function()
@@ -43,6 +43,12 @@ function M.setup(opts)
     -- Optional: Set up key mappings
     if opts.mappings ~= false then
         vim.keymap.set('n', '<leader>fm', ':FIM<CR>', { noremap = true, silent = true, desc = "Fill In Middle" })
+        vim.keymap.set('i', '<A-CR>', function()
+            -- Exit insert mode, call your function, then return to insert mode
+            vim.cmd('stopinsert')
+            fim.fill_in_middle(config)
+            vim.cmd('startinsert')
+        end, { noremap = true, silent = true, desc = "Trigger Ollama completion" })
     end
 end
 
