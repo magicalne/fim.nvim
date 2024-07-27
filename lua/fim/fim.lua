@@ -64,10 +64,11 @@ function M.extract_function_parts()
 
         return prefix, suffix
     else
-        -- If we're not in a function, take `` lines above and below
+        -- If we're not in a function, take  lines above and below
         local cursor_row, _ = unpack(vim.api.nvim_win_get_cursor(0))
-        local start_row = math.max(0, cursor_row - config.context_lines - 1)  -- -6 because cursor_row is 1-indexed
-        local end_row = cursor_row + config.context_lines
+        local start_row = math.max(0, cursor_row - config.context_lines - 1)
+        local rows = vim.fn.line('$')
+        local end_row = math.min(rows, cursor_row + config.context_lines)
         local lines = vim.api.nvim_buf_get_lines(bufnr, start_row, end_row, false)
         
         local prefix_lines = vim.list_slice(lines, 1, cursor_row - start_row)
@@ -75,6 +76,8 @@ function M.extract_function_parts()
 
         local prefix = table.concat(prefix_lines, "\n")
         local suffix = table.concat(suffix_lines, "\n")
+        -- print(prefix)
+        -- print(suffix)
 
         return prefix, suffix
     end
@@ -106,7 +109,7 @@ function M.send_to_ollama(prefix, suffix)
 
     if response.status == 200 then
         local result = vim.fn.json_decode(response.body)
-        print("response: ", result.response)
+        -- print("response: ", result.response)
         local response = result.response
         response = response:gsub("\n+", "\n")
         return response
@@ -125,12 +128,11 @@ function M.fill_in_middle()
         local completed_code = M.send_to_ollama(prefix, suffix)
         local extracted_code = extract_completion_code(completed_code)
         if extracted_code then
-          print(extracted_code)
+          -- print(extracted_code)
         else
           print("No completion found in the response")
         end
         if extracted_code then
-            -- 
             local buf = vim.api.nvim_get_current_buf()
             -- Get the cursor position
             local row, col = unpack(vim.api.nvim_win_get_cursor(0))
@@ -144,12 +146,12 @@ function M.fill_in_middle()
               table.insert(indented_lines, string.rep(' ', indent) .. line)
             end
             
-            -- Insert the completion code
-            vim.api.nvim_buf_set_lines(buf, row - 1, row - 1, false, indented_lines)
+            -- Insert the completion code in the next line of the current line.
+            vim.api.nvim_buf_set_lines(buf, row, row, false, indented_lines)
             
             -- Move the cursor to the end of the inserted text
-            local new_row = row + #indented_lines - 1
-            local new_col = #indented_lines[#indented_lines]
+            local new_row = row + #indented_lines
+            local new_col = #indented_lines[#indented_lines] + col
             vim.api.nvim_win_set_cursor(0, {new_row, new_col})
         end
     else

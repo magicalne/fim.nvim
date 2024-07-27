@@ -7,7 +7,7 @@ local default_config = {
     temperature = 0.2,
     template = "<fim_prefix>%s<fim_suffix>%s<fim_middle>",
     num_predict = 1024,
-    context_lines = 5,  -- Number of lines to extract above/below cursor when not in a function
+    context_lines = 50,  -- Number of lines to extract above/below cursor when not in a function
 }
 
 -- Ensure required dependencies are available
