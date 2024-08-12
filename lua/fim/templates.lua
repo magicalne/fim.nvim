@@ -1,7 +1,8 @@
 local M = {}
 
 local templates = {
-    general = [[You are a HOLE FILLER. You are provided with a file containing holes, formatted as '{{HOLE_NAME}}'. Your TASK is to complete with a string to replace this hole with, inside a <COMPLETION/> XML tag, including context-aware indentation, if needed.  All completions MUST be truthful, accurate, well-written and correct.
+    general = {
+        prompt = [[You are a HOLE FILLER. You are provided with a file containing holes, formatted as '{{HOLE_NAME}}'. Your TASK is to complete with a string to replace this hole with, inside a <COMPLETION/> XML tag, including context-aware indentation, if needed.  All completions MUST be truthful, accurate, well-written and correct.
 
 ## EXAMPLE QUERY:
 
@@ -86,11 +87,47 @@ function hypothenuse(a, b) {
 <COMPLETION>a ** 2 + </COMPLETION>`
 
 
-<QUERY>\n%s{{FILL_HERE}}%s</QUERY>\nTASK: Fill the {{FILL_HERE}} hole. Answer only with the CORRECT completion, and NOTHING ELSE. Do it now.\n<COMPLETION>]],
-    }
+<QUERY>\n%s{{FILL_HERE}}%s</QUERY>\nTASK: Fill the {{FILL_HERE}} hole. Answer only with the CORRECT completion, and NOTHING ELSE. Do it now.\n</COMPLETION>]],
+        stop = {"</COMPLETION>"}
+    },
+    codegemma = {
+        prompt = "<|fim_prefix|>%s<|fim_suffix|>%s<|fim_middle|>",
+        stop = { "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>" }
+    },
+    codellama = {
+        prompt = "<PRE>%s<SUF>%s<MID>",
+        stop = { "<EOT>"}
+    },
+    edwardzcodegemmaq6 = {
+        prompt = "<|fim_prefix|>%s<|fim_suffix|>%s<|fim_middle|>",
+        stop = { "<|fim_prefix|>", "<|fim_suffix|>", "<|fim_middle|>", "<|file_separator|>" }
+    },
+    starcoder2 = {
+        prompt = "<fim_prefix>%s<fim_suffix>%s<fim_middle>",
+        stop = { "<fim_prefix>", "<fim_suffix>", "<fim_middle>", "<|endoftext|>", "<file_sep>", },
+    },
+}
 
-function M.getTemplate(templateName)
-    return templates[templateName]
+local function splitString(str)
+    local colonIndex = string.find(str, ":")
+    if colonIndex then
+        return string.sub(str, 1, colonIndex - 1)
+    else
+        return str
+    end
+end
+
+function M.getTemplate(modelname)
+
+    local name = splitString(modelname)
+    local name = string.gsub(name, "/", "")
+    local template = templates[name]
+    if template ~= nil then
+        return template
+    else
+        return templates["general"]
+    end
+     
 end
 
 return M
